@@ -5,18 +5,26 @@ clc; close all; clear;
 
 %% State Space
 
-syms x1 x2 x3 x4 x9 x10 x11 real;
+syms x1 x2 x3 x4 x9 x10 x11 real; % Original states of the system
 syms a da dh real; % Angle of attack, pitching velocity, plunging velocity
-Q = [x1 x2 x3 x4 x9 x10 x11 a da dh].'; % Coordinates of the system
+Q = [x1 x2 x3 x4 x9 x10 x11 a da dh].'; % States of the system
 
-
-syms CNa beta A1 A2 b1 b2 M V c b real; % Circulatory component constants
+syms CNa;
+% syms CNs(x1,x2,x3,x4,x9,x10,a,da,dh); % Static normal coefficient
+% assume(CNs(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
+% syms CNa(x1,x2,x3,x4,x9,x10,a,da,dh); % Slope of the static normal coefficient
+% assume(CNa(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
+syms beta M V b real; % Compressibility factor, Mach number, velocity, airfoil semichord
+syms A1 A2 b1 b2; % Circulatory component constants
 syms Ka Kq Ti real; % Noncirculatory component constants
 syms Tp Tf Tv; % Nonlinear flow components
-syms fp(x1,x2,x3,x4,x9,x10,a,da,dh); % Steady lift coefficient (is a function of alpha and plunging)
+syms fp(x1,x2,x3,x4,x9,x10,a,da,dh);
 assume(fp(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
 syms dCv(x1,x2,x3,x4,x9,x10,a,da,dh);
 assume(dCv(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
+
+% fp = (2*sqrt(CNs/CNa)-1)^2; % Effective point of separation
+c = 2*b; % Airfoil chord
 
 % Drift vector
 f = [-b1*beta^2*(2*V/c)*x1+a+atan(dh/V)+da*c/(2*V);
@@ -34,13 +42,6 @@ f = formula(f);
 ga = [0 0 0 0 0 0 0 0 1 0].'; % Control vector of the pitching motion
 gh = [0 0 0 0 0 0 0 0 0 1].'; % Control vector of the plunging motion
 
-% %% Lie Brackets and Symmetric Products
-% 
-% % Symmetric products
-% gaga = symmetric_product(Q,f,ga,ga); % bad symmetric product (potential obstruction to STLC)
-% gagh = symmetric_product(Q,f,ga,gh); % good symmetric product
-% ghgh = symmetric_product(Q,f,gh,gh); % bad symmetric product (potential obstruction to STLC)
-% 
 %% Lift and drag coefficients
 
 q = da*c/V; % Pitch rate
@@ -65,47 +66,34 @@ Cc = Ccf; % Chord force coefficient
 % Total lift and drag coefficients
 Cl = Cn*cos(a)+Cc*sin(a); % Lift coefficient
 Cd = Cn*sin(a)-Cc*cos(a); % Drag coefficient
-% 
-% H = Cl;
-% D = Cd;
-% 
-% % Lie derivatives (rate of change of H along the dynamics given by gxgx)
-% LgagaH = Lie_Derivative(Q,gaga,H);
-% LgaghH = Lie_Derivative(Q,gagh,H);
-% LghghH = Lie_Derivative(Q,ghgh,H);
-% 
-% % Lie derivatives (rate of change of D along the dynamics given by gxgx)
-% LgagaD = Lie_Derivative(Q,gaga,D);
-% LgaghD = Lie_Derivative(Q,gagh,D);
-% LghghD = Lie_Derivative(Q,ghgh,D);
-% 
-% %% Pullback
-% 
-% n = 2; % Pullback order
-% 
+
+%% Pullback
+
+n = 2; % Pullback order
+
 syms w A_alpha H phi real; % Constants of the inputs
-% syms t real; % Independent variable
-% 
-% G = [ga gh];
-% 
-% % Inputs
-% u_alpha = w^2*A_alpha*cos(w*t);
-% u_h = w^2*H*b*cos(w*t+phi);
-% Us = [u_alpha u_h];
-% 
-% % Pullback of f along the flow of G
-% F = simplify(pullback(Q,f,G,Us,t,n),'IgnoreAnalyticConstraints',true);
-% Gvector_averaged = simplify(w/(2*pi)*int(F-f,t,0,2*pi/w));
-% 
+syms t real; % Independent variable
 
-%% Series expansion (averaged values)
+% Inputs
+ua = w^2*A_alpha*cos(w*t);
+uh = w^2*H*b*cos(w*t+phi);
+% G = ga*ua+gh*uh;
+G = [ga gh]; Us = [ua uh];
 
-% Amplitude and phase of the states
-syms A_1 A_2 A_3 A_4 A_9 A_10 A_11 real;
-syms phi_1 phi_2 phi_3 phi_4 phi_9 phi_10 phi_11 real;
-Amplitudes = [A_1; A_2; A_3; A_4; A_9; A_10; A_11; A_alpha; w*A_alpha; w*H*b];
-phis = [phi_1; phi_2; phi_3; phi_4; phi_9; phi_10; phi_11; 0; pi/2; phi+pi/2];
+% Pullback of f along the flow of G
+F = simplify(pullback(Q,f,G,Us,t,n),'IgnoreAnalyticConstraints',true);
+Gvector_averaged = simplify(w/(2*pi)*int(F-f,t,0,2*pi/w));
 
-% Averaged increases/decreases
-dCn = averaged_Taylor(Cn,Q,Amplitudes,phis);
-% dCd = averaged_Taylor(Cd,Q,Amplitudes,phis); toc 
+
+% %% Series expansion (averaged values)
+% 
+% % Amplitude and phase of the states
+% syms A_1 A_2 A_3 A_4 A_9 A_10 A_11 real;
+% syms phi_1 phi_2 phi_3 phi_4 phi_9 phi_10 phi_11 real;
+% Amplitudes = [A_1; A_2; A_3; A_4; A_9; A_10; A_11; A_alpha; w*A_alpha; w*H*b];
+% phis = [phi_1; phi_2; phi_3; phi_4; phi_9; phi_10; phi_11; 0; pi/2; phi+pi/2];
+% 
+% % Averaged increases/decreases
+% dCn = averaged_Taylor(Cn,Q,Amplitudes,phis);
+% % dCd = averaged_Taylor(Cd,Q,Amplitudes,phis);
+toc 

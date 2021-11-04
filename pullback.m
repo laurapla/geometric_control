@@ -1,4 +1,4 @@
-function F = pullback(Q,f,G,U,variable,order)
+function F = pullback(Q,f,G,var,N)
 
 % F = pullback of the vector field f along the flow phi_t^G of the
 % time-varying vector field G
@@ -7,29 +7,38 @@ function F = pullback(Q,f,G,U,variable,order)
 % f = drift vector
 % G = matrix with the control vectors in columns
 % U = vector with the inputs in columns
-% variable = integration variable
-% order = order of the approximation
+% var = integration variable
+% N = order of the approximation
 
-F = f;
-n = size(G,2); % number of control vectors and inputs
+F = f; % Initialize the pullback with the first term
 
-syms s;
-U = subs(U,variable,s);
+s = sym('s',[N 1]);
+s = [var; s]; % Integration variables
 
-for i = 1:order
-    for j = 1:n
-        if i==1
-            F = F+Lie_Bracket(Q,G(:,j),f)*int(U(:,j),s,0,variable);
-        elseif i==2
-            sum2 = 0;
-            for l = 1:n
-                syms s2;
-                Uj = subs(U(:,j),s,s2);
-                sum2 = sum2+Lie_Bracket(Q,G(:,j),Lie_Bracket(Q,G(:,l),f))*int(Uj*int(U(:,l),s,0,s2),s2,0,variable);
-            end
-            F = simplify(F+sum2);
-        end
+% First term of the Gpullback
+V1 = Lie_Bracket(Q,subs(G,var,s(2)),f);
+Vint1 = int(V1,s(2),0,s(1));
+F = F+simplify(Vint1); % add the term to the pullback
+
+% Second to N terms of the Gpullback
+i = 2;
+while i<=N
+    
+    % Compute the Lie Bracket
+    V2 = Lie_Bracket(Q,subs(G,var,s(i+1)),V1);
+    Vint2 = V2;
+    
+    % Integrate the Lie Bracket
+    for j = i:-1:1
+        Vint2 = int(Vint2,s(j+1),0,s(j));
     end
+    
+    F = F+simplify(Vint2);
+    V1 = V2;
+    i = i+1;
+    
 end
+
+F = simplify(F);
 
 end
