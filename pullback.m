@@ -6,7 +6,6 @@ function F = pullback(Q,f,G,var,N)
 % [x;y;z] for Cartesian coordinates) / states of the system
 % f = drift vector
 % G = matrix with the control vectors in columns
-% U = vector with the inputs in columns
 % var = integration variable
 % N = order of the approximation
 
