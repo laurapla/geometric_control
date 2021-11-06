@@ -7,7 +7,7 @@ for i = 1:N
     der1 = diff(Psi,Q(i));
     for q = 1:N
         der2 = diff(der1,Q(q));
-        dPsi = dPsi+der2*A(i)*A(q)*cos(phi(i)-phi(q))/2;
+        dPsi = dPsi+der2*A(i)*A(q)*cos(phi(i)-phi(q))/4;
     end
 end
 

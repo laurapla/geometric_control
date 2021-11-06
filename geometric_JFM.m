@@ -1,4 +1,4 @@
-% University of California, Irvine - Winter 2020
+% University of California, Irvine - Fall 2021
 % Laura Pla Olea - lplaolea@uci.edu
 
 clc; close all; clear;
@@ -7,6 +7,9 @@ clc; close all; clear;
 
 nc = 4; % Number of circulatory states
 n = 2; % Pullback order
+nT = 2; % Order of the Taylor expansion
+
+In = 'HA'; % Motion: 'H' for plunging, 'A' for pitching, 'HA' for both
 
 %% Definitions
 
@@ -16,6 +19,7 @@ xc = sym('xc', [nc 1]); % Circulatory states
 
 % Parameters of the system
 syms t real; % Time - Independent variable
+syms rho real; % Density
 syms U b e real; % Forward speed, airfoil semichord, pitching axis
 syms mv tv kda real; % Added mass, added mass constant, da constant
 syms w A_alpha H phi real; % Angular velocity, pitching amplitude, plunging amplitude, phase between pitching and plunging
@@ -41,6 +45,11 @@ w = w/eps;
 U = U/eps;
 A_alpha = A_alpha*eps;
 H = H*eps;
+if strcmp(In,'H')
+    A_alpha = 0; phi = 0;
+elseif strcmp(In,'A')
+    H = 0;
+end
 
 c = 2*b;
 ka = U*c/2;
@@ -85,3 +94,31 @@ Favg_sol = subs(F_avg,[da dh],[daeq dheq]);
 xceq = -inv(A)*(Favg_sol(1:nc)-A*xc);
 
 Qeq = [xceq; xveq; a; daeq; dheq];
+
+%% Averaged output
+
+Ax = sym('Ax',[nc 1]); % Amplitude of the circulatory states
+Ax = Ax*eps;
+phix = sym('phix',[nc 1]); % Phase of the circulatory states
+syms Av phiv real; % Amplitude and phase of the viscous state
+Av = Av*eps;
+
+dAx = Ax.*cos(w*t+phix);
+dAv = Av*cos(w*t+phiv);
+ddalpha = w*A_alpha*sin(w*t);
+dalpha = -A_alpha*cos(w*t);
+dhdot = w*H*b*(sin(w*t+phi)-sin(phi));
+dq = [dAx; dAv; dalpha; ddalpha; dhdot];
+
+% Lift force
+L = rho*U*(C*xc+khf*Gamma0)+mv*xv*cos(a);
+CL = L/(rho*U^2*b);
+
+% Taylor expansion
+CL_Taylor = Taylor_expansion(CL,Q,Qeq,dq,2);
+CL_avg = simplify(int(CL_Taylor,t,0,2*pi/w)*w/(2*pi));
+
+%% Order of terms
+
+epsmax = polynomialDegree(CL_avg,eps);
+ord_terms = simplify(coeffs(CL_avg,eps,'All'));
