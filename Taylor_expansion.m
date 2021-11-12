@@ -25,7 +25,7 @@ while j<=order
     end
     
     % Differentiate with respect to the states
-    der2 = 0; derivative_all = 0;
+    der2 = 0;
     for i = 1:N
         derivative = diff(der1,Q(i));
         der2 = der2+derivative*dq(i)/factorial(j)*factorial(j-1);

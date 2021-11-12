@@ -1,15 +1,17 @@
 % University of California, Irvine - Fall 2021
 % Laura Pla Olea - lplaolea@uci.edu
 
-clc; close all; clear;
+clc; close all;
 
 %% Inputs
 
 nc = 4; % Number of circulatory states
 n = 2; % Pullback order
 nT = 2; % Order of the Taylor expansion
+norder = 2; % Order of the averaged output that we want to keep
 
 In = 'HA'; % Motion: 'H' for plunging, 'A' for pitching, 'HA' for both
+Out = 'D'; % Output: 'L' for lift coefficient, 'D' for drag coefficient
 
 %% Definitions
 
@@ -91,7 +93,7 @@ dheq = 0; % The equilibrium of dh is automatically satisfied, so for simplificat
 daeq = solve(F_avg(nc+2)==0,da); % da of equilibrium
 xveq = solve(F_avg(nc+1)==0,xv); % xv of equilibrium
 Favg_sol = subs(F_avg,[da dh],[daeq dheq]);
-xceq = -inv(A)*(Favg_sol(1:nc)-A*xc);
+xceq = -inv(A)*(Favg_sol(1:nc)-A*xc); % xc of equilibrium
 
 Qeq = [xceq; xveq; a; daeq; dheq];
 
@@ -112,13 +114,33 @@ dq = [dAx; dAv; dalpha; ddalpha; dhdot];
 
 % Lift force
 L = rho*U*(C*xc+khf*Gamma0)+mv*xv*cos(a);
-CL = L/(rho*U^2*b);
+if strcmp(Out,'L')
+    Psi = L/(rho*U^2*b);
+elseif strcmp(Out,'D')
+    syms ks(a_eff)
+    a_eff = a+atan(dh/U);
+    ks = ks(a_eff);
+    % Drag force
+    D = L*tan(a)-ks*rho*b*((C*xc+khf*Gamma0)/(2*pi*b)-b*da/2)^2;
+    Psi = D/(rho*U^2*b);
+end
+
 
 % Taylor expansion
-CL_Taylor = Taylor_expansion(CL,Q,Qeq,dq,2);
-CL_avg = simplify(int(CL_Taylor,t,0,2*pi/w)*w/(2*pi));
+Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
+Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
 
 %% Order of terms
 
-epsmax = polynomialDegree(CL_avg,eps);
-ord_terms = simplify(coeffs(CL_avg,eps,'All'));
+epsmax = polynomialDegree(expand(Psi_avg),eps);
+ord_terms = simplify(coeffs(formula(expand(Psi_avg)),eps,'All'));
+
+for i = 1:epsmax+1
+    disp(['O(',char(eps^(i-1)),')']);
+    pretty(ord_terms(epsmax+2-i));
+end
+
+Psi_truncated = 0;
+for i = 0:norder
+    Psi_truncated = Psi_truncated+ord_terms(epsmax+1-i);
+end
