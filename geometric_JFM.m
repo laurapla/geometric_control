@@ -11,7 +11,7 @@ nT = 2; % Order of the Taylor expansion
 norder = 2; % Order of the averaged output that we want to keep
 
 In = 'HA'; % Motion: 'H' for plunging, 'A' for pitching, 'HA' for both
-Out = 'S'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'S' for point of separation
+Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'S' for point of separation
 
 %% Definitions
 
@@ -101,8 +101,7 @@ G = ga*ua+gh*uh;
 % Pullback of f along the flow of G
 F = simplify(pullback(Q,f,G,t,n),'IgnoreAnalyticConstraints',true);
 Gvec_avg = simplify(w/(2*pi)*int(F-f,t,0,2*pi/w));
-f_avg = simplify(w/(2*pi)*int(f,t,0,2*pi/w));
-F_avg = simplify(f_avg+Gvec_avg);
+F_avg = simplify(f+Gvec_avg);
 
 %% Equilibrium of the averaged dynamics
 

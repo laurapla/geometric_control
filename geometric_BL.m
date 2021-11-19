@@ -1,39 +1,72 @@
 % University of California, Irvine - Summer 2021
 % Laura Pla Olea - lplaolea@uci.edu
-tic
+
 clc; close all; clear;
 
-%% State Space
+%% Inputs
 
-syms x1 x2 x3 x4 x9 x10 x11 real; % Original states of the system
+n = 2; % Pullback order
+nT = 2; % Order of the Taylor expansion
+norder = 2; % Order of the averaged output that we want to keep
+
+In = 'HA'; % Motion: 'H' for plunging, 'A' for pitching, 'HA' for both
+Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient
+
+%% Definitions
+
+% States of the system
+x = sym('x',[11 1]); % Original states of the BL system
+x(5:8) = [];
 syms a da dh real; % Angle of attack, pitching velocity, plunging velocity
-Q = [x1 x2 x3 x4 x9 x10 x11 a da dh].'; % States of the system
 
-syms CNa;
-% syms CNs(x1,x2,x3,x4,x9,x10,a,da,dh); % Static normal coefficient
-% assume(CNs(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
-% syms CNa(x1,x2,x3,x4,x9,x10,a,da,dh); % Slope of the static normal coefficient
-% assume(CNa(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
-syms beta M V b real; % Compressibility factor, Mach number, velocity, airfoil semichord
+% Parameters of the system
+syms t real; % Time - Independent variable
+syms rho real; % Density
+syms beta M U b real; % Compressibility factor, Mach number, velocity, airfoil semichord
 syms A1 A2 b1 b2; % Circulatory component constants
 syms Ka Kq Ti real; % Noncirculatory component constants
-syms Tp Tf Tv; % Nonlinear flow components
-syms fp(x1,x2,x3,x4,x9,x10,a,da,dh);
-assume(fp(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
-syms dCv(x1,x2,x3,x4,x9,x10,a,da,dh);
-assume(dCv(x1,x2,x3,x4,x9,x10,a,da,dh),'real');
+syms Tp Tf Tv real; % Nonlinear flow components
+syms fp; % Effective point of separation
+syms w A_alpha H phi real; % Angular velocity, pitching amplitude, plunging amplitude, phase between pitching and plunging
 
-% fp = (2*sqrt(CNs/CNa)-1)^2; % Effective point of separation
+syms CNa;
+syms CNs(a_eff_); % Steady lift coefficient (function of alpha and plunging)
+assume(CNs(a_eff_),'real');
+
+syms dCv(x9,x10,aE_,a_eff_,da_); % Derivative of the vortex strength
+assume(dCv(x9,x10,aE_,a_eff_,da_),'real');
+
+syms eps real; % Epsilon (to determine the order of the terms)
+
+% Order of the variables
+w = w/eps;
+U = U/eps;
+A_alpha = A_alpha*eps;
+H = H*eps;
+if strcmp(In,'H')
+    A_alpha = 0; phi = 0;
+elseif strcmp(In,'A')
+    H = 0;
+end
+
 c = 2*b; % Airfoil chord
+a_eff = a+atan(dh/U); % Effective angle of attack
+aE = (2*U/c)*beta^2*(A1*b1*x(1)+A2*b2*x(2)); % Effective angle of attack
+fp = (2*sqrt(CNs(x(5)/CNa)/x(5))-1)^2; % Effective point of separation
+
+%% State Space Model
+
+% States of the system
+Q = [x; a; da; dh];
 
 % Drift vector
-f = [-b1*beta^2*(2*V/c)*x1+a+atan(dh/V)+da*c/(2*V);
-    -b2*beta^2*(2*V/c)*x2+a+atan(dh/V)+da*c/(2*V);
-    -x3/(Ka*Ti)+a+atan(dh/V);
-    -x4/(Kq*Ti)+da*c/V;
-    (CNa*beta^2*(2*V/c)*(A1*b1*x1+A2*b2*x2)-4/(M*Ka*Ti)*x3-1/(M*Kq*Ti)*x4-x9+4/M*(a+atan(dh/V))+da*c/V/M)*2*V/c/Tp;
-    (-x10/Tf+fp/Tf)*2*V/c;
-    (-x11/Tv+dCv/Tv)*2*V/c;
+f = [-b1*beta^2*(2*U/c)*x(1)+a_eff+da*c/(2*U);
+    -b2*beta^2*(2*U/c)*x(2)+a_eff+da*c/(2*U);
+    -x(3)/(Ka*Ti)+a_eff;
+    -x(4)/(Kq*Ti)+da*c/U;
+    (CNa*beta^2*(2*U/c)*(A1*b1*x(1)+A2*b2*x(2))-4/(M*Ka*Ti)*x(3)-1/(M*Kq*Ti)*x(4)-x(5)+4/M*a_eff+da*c/U/M)*2*U/c/Tp;
+    (-x(6)/Tf+fp/Tf)*2*U/c;
+    (-x(7)/Tv+dCv(x(5),x(6),aE,a_eff,da)/Tv)*2*U/c;
     da;
     0;
     0];
@@ -44,24 +77,22 @@ gh = [0 0 0 0 0 0 0 0 0 1].'; % Control vector of the plunging motion
 
 %% Lift and drag coefficients
 
-q = da*c/V; % Pitch rate
+q = da*c/U; % Pitch rate
 
 % Normal force coefficients
-Cnia = -4/M*x3/(Ka*Ti)+4/M*(a+atan(dh/V)); % Non-circulatory load due to the angle of attack
-Cniq = -1/M*x4/(Kq*Ti)+q/M; % Non-circulatory load due to the pitch rate
+Cnia = -4/M*x(3)/(Ka*Ti)+4/M*a_eff; % Non-circulatory load due to the angle of attack
+Cniq = -1/M*x(4)/(Kq*Ti)+q/M; % Non-circulatory load due to the pitch rate
 Cni = Cnia+Cniq; % Total non-circulatory (impulsive) normal force coefficient
 
-Cnf = CNa*beta^2*(2*V/c)*(A1*b1*x1+A2*b2*x2)*((1+sqrt(x10))/2)^2; % Circulatory load due to TE separation
-Cnv = x11; % Circulatory load due to LE separation (vortex)
+Cnf = CNa*aE*((1+sqrt(x(6)))/2)^2; % Circulatory load due to TE separation
+Cnv = x(7); % Circulatory load due to LE separation (vortex)
 
 Cn = Cnf+Cnv+Cni; % Normal force coefficient
 
 % Chord force coefficient
-aE = (2*V/c)*beta^2*(A1*b1*x1+A2*b2*x2); % Effective angle of attack
 syms eta real; % Parameter that accounts for the viscous effects
 Ccp = CNa*aE^2; % Chord force under attached flow conditions
-Ccf = eta*CNa*aE^2*sqrt(x10); % Chord force coefficient under TE separation
-Cc = Ccf; % Chord force coefficient
+Cc = eta*Ccp*sqrt(x(6)); % Chord force coefficient under TE separation
 
 % Total lift and drag coefficients
 Cl = Cn*cos(a)+Cc*sin(a); % Lift coefficient
@@ -69,31 +100,74 @@ Cd = Cn*sin(a)-Cc*cos(a); % Drag coefficient
 
 %% Pullback
 
-n = 2; % Pullback order
-
-syms w A_alpha H phi real; % Constants of the inputs
-syms t real; % Independent variable
-
 % Inputs
 ua = w^2*A_alpha*cos(w*t);
 uh = w^2*H*b*cos(w*t+phi);
-% G = ga*ua+gh*uh;
-G = [ga gh]; Us = [ua uh];
+
+G = ga*ua+gh*uh;
 
 % Pullback of f along the flow of G
-F = simplify(pullback(Q,f,G,Us,t,n),'IgnoreAnalyticConstraints',true);
-Gvector_averaged = simplify(w/(2*pi)*int(F-f,t,0,2*pi/w));
+F = simplify(pullback(Q,f,G,t,n),'IgnoreAnalyticConstraints',true);
+Gvec_avg = simplify(w/(2*pi)*int(F-f,t,0,2*pi/w));
+F_avg = simplify(f+Gvec_avg);
 
+%% Equilibrium of the averaged dynamics
 
-% %% Series expansion (averaged values)
-% 
-% % Amplitude and phase of the states
-% syms A_1 A_2 A_3 A_4 A_9 A_10 A_11 real;
-% syms phi_1 phi_2 phi_3 phi_4 phi_9 phi_10 phi_11 real;
-% Amplitudes = [A_1; A_2; A_3; A_4; A_9; A_10; A_11; A_alpha; w*A_alpha; w*H*b];
-% phis = [phi_1; phi_2; phi_3; phi_4; phi_9; phi_10; phi_11; 0; pi/2; phi+pi/2];
-% 
-% % Averaged increases/decreases
-% dCn = averaged_Taylor(Cn,Q,Amplitudes,phis);
-% % dCd = averaged_Taylor(Cd,Q,Amplitudes,phis);
-toc 
+dheq = 0; % The equilibrium of dh is automatically satisfied, so for simplification we assume it's zero
+
+% Solving the equilibrium points of the averaged dynamics
+daeq = solve(F_avg(8)==0,da); % da of equilibrium
+Favg_sol = subs(F_avg,[da dh],[daeq dheq]);
+
+xeq = x;
+for i = 1:length(x)
+    xeq(i) = solve(Favg_sol(i)==0,x(i));
+    if i==5
+        xeq(i) = simplify(subs(xeq(i),A2,1-A1));
+    end
+    Favg_sol = subs(Favg_sol,x(i),xeq(i));
+end
+
+Qeq = [xeq; a; daeq; dheq];
+
+%% Averaged output
+
+% Amplitude and phase of the states
+Ax = sym('Ax',[11 1]); % Amplitude of the original BL states
+Ax(5:8) = [];
+phix = sym('phix',[11 1]); % Phase of the original BL states
+phix(5:8) = [];
+
+dAx = Ax.*cos(w*t+phix);
+ddalpha = w*A_alpha*sin(w*t);
+dalpha = -A_alpha*cos(w*t);
+dhdot = w*H*b*(sin(w*t+phi)-sin(phi));
+dq = [dAx; dalpha; ddalpha; dhdot];
+
+if strcmp(Out,'L')
+    Psi = Cl;
+elseif strcmp(Out,'D')
+    Psi = Cd;
+end
+
+% Taylor expansion
+Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
+Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
+
+%% Order of terms
+
+epsmax = polynomialDegree(expand(Psi_avg),eps);
+ord_terms = simplify(coeffs(formula(expand(Psi_avg)),eps,'All'));
+
+for i = 1:epsmax+1
+    disp(['O(',char(eps^(i-1)),')']);
+    pretty(ord_terms(epsmax+2-i));
+end
+
+if norder>epsmax
+    norder = epsmax;
+end
+Psi_truncated = 0;
+for i = 0:norder
+    Psi_truncated = Psi_truncated+ord_terms(epsmax+1-i);
+end
