@@ -26,7 +26,7 @@ syms beta M U b real; % Compressibility factor, Mach number, velocity, airfoil s
 syms A1 A2 b1 b2; % Circulatory component constants
 syms Ka Kq Ti real; % Noncirculatory component constants
 syms Tp Tf Tv real; % Nonlinear flow components
-syms fp; % Effective point of separation
+syms fp(a_eff_); % Effective point of separation
 syms w A_alpha H phi real; % Angular velocity, pitching amplitude, plunging amplitude, phase between pitching and plunging
 
 syms CNa;
@@ -52,7 +52,7 @@ end
 c = 2*b; % Airfoil chord
 a_eff = a+atan(dh/U); % Effective angle of attack
 aE = (2*U/c)*beta^2*(A1*b1*x(1)+A2*b2*x(2)); % Effective angle of attack
-fp = (2*sqrt(CNs(x(5)/CNa)/x(5))-1)^2; % Effective point of separation
+% fp = (2*sqrt(CNs(x(5)/CNa)/x(5))-1)^2; % Effective point of separation
 
 %% State Space Model
 
@@ -65,7 +65,7 @@ f = [-b1*beta^2*(2*U/c)*x(1)+a_eff+da*c/(2*U);
     -x(3)/(Ka*Ti)+a_eff;
     -x(4)/(Kq*Ti)+da*c/U;
     (CNa*beta^2*(2*U/c)*(A1*b1*x(1)+A2*b2*x(2))-4/(M*Ka*Ti)*x(3)-1/(M*Kq*Ti)*x(4)-x(5)+4/M*a_eff+da*c/U/M)*2*U/c/Tp;
-    (-x(6)/Tf+fp/Tf)*2*U/c;
+    (-x(6)/Tf+fp(x(5)/CNa)/Tf)*2*U/c;
     (-x(7)/Tv+dCv(x(5),x(6),aE,a_eff,da)/Tv)*2*U/c;
     da;
     0;
@@ -108,7 +108,7 @@ G = ga*ua+gh*uh;
 
 % Pullback of f along the flow of G
 F = simplify(pullback(Q,f,G,t,n),'IgnoreAnalyticConstraints',true);
-Gvec_avg = simplify(w/(2*pi)*int(F-f,t,0,2*pi/w));
+Gvec_avg = simplify(expand(w/(2*pi)*int(F-f,t,0,2*pi/w)));
 F_avg = simplify(f+Gvec_avg);
 
 %% Equilibrium of the averaged dynamics
@@ -122,13 +122,11 @@ Favg_sol = subs(F_avg,[da dh],[daeq dheq]);
 xeq = x;
 for i = 1:length(x)
     xeq(i) = solve(Favg_sol(i)==0,x(i));
-    if i==5
-        xeq(i) = simplify(subs(xeq(i),A2,1-A1));
-    end
+    xeq(i) = simplify(subs(xeq(i),A2,1-A1));
     Favg_sol = subs(Favg_sol,x(i),xeq(i));
 end
 
-Qeq = [xeq; a; daeq; dheq];
+Qeq = simplify([xeq; a; daeq; dheq]);
 
 %% Averaged output
 
@@ -153,21 +151,35 @@ end
 % Taylor expansion
 Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
 Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
+Psi_avg = simplify(subs(Psi_avg,A2,1-A1));
 
 %% Order of terms
 
-epsmax = polynomialDegree(expand(Psi_avg),eps);
-ord_terms = simplify(coeffs(formula(expand(Psi_avg)),eps,'All'));
+Psi_avg = collect(Psi_avg,eps);
 
-for i = 1:epsmax+1
-    disp(['O(',char(eps^(i-1)),')']);
-    pretty(ord_terms(epsmax+2-i));
-end
+% Separate between numerator and denominator
+terms = children(Psi_avg);
+num = terms(1); % Numerator of Psi_avg
+den = 1/terms(2); % Denominator of Psi_avg
 
-if norder>epsmax
-    norder = epsmax;
+% Order of the numerator and denominator
+ord_terms_num = simplify(coeffs(formula(num),eps,'All'));
+ord_terms_den = simplify(coeffs(formula(den),eps,'All'));
+epsmax_num = length(ord_terms_num)-1;
+epsmax_den = length(ord_terms_den)-1;
+
+% Simplify the terms
+terms = simplify(expand(ord_terms_num/ord_terms_den(1)));
+
+% for i = 1:epsmax_num+1
+%     disp(['O(',char(eps^(i-1)),')']);
+%     pretty(ord_terms(epsmax+2-i));
+% end
+
+if norder>epsmax_num-epsmax_den
+    norder = epsmax_num-epsmax_den;
 end
 Psi_truncated = 0;
 for i = 0:norder
-    Psi_truncated = Psi_truncated+ord_terms(epsmax+1-i);
+    Psi_truncated = simplify(Psi_truncated+terms(epsmax_num-epsmax_den+1-i));
 end
