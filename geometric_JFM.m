@@ -29,7 +29,7 @@ syms w A_alpha H phi real; % Angular velocity, pitching amplitude, plunging ampl
 syms CLs(a_eff); % Steady lift coefficient (function of alpha and plunging)
 assume(CLs(a_eff),'real');
 
-syms eps real; % Epsilon (to determine the order of the terms)
+syms epsil real; % Epsilon (to determine the order of the terms)
 
 % Transfer function between the quasi-steady circulation and the effective
 % circulation
@@ -43,10 +43,10 @@ B = bb-khf*aa;
 C = [zeros(1,nc-1) 1];
 
 % Order of the variables
-w = w/eps;
-U = U/eps;
-A_alpha = A_alpha*eps;
-H = H*eps;
+w = w/epsil;
+U = U/epsil;
+A_alpha = A_alpha*epsil;
+H = H*epsil;
 if strcmp(In,'H')
     A_alpha = 0; phi = 0;
 elseif strcmp(In,'A')
@@ -128,10 +128,10 @@ end
 %% Averaged output
 
 Ax = sym('Ax',[nc 1]); % Amplitude of the circulatory states
-Ax = Ax*eps;
+Ax = Ax*epsil;
 phix = sym('phix',[nc 1]); % Phase of the circulatory states
 syms Av phiv real; % Amplitude and phase of the viscous state
-Av = Av*eps;
+Av = Av*epsil;
 
 dAx = Ax.*cos(w*t+phix);
 dAv = Av*cos(w*t+phiv);
@@ -157,8 +157,7 @@ if ~strcmp(Out,'S')
     end
     
     % Taylor expansion
-    Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
-    Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
+    Psi_avg = Taylor_expansion(Psi,Q,Qeq,dq,2);
 
 else
     
@@ -168,11 +167,11 @@ end
 
 %% Order of terms
 
-epsmax = polynomialDegree(expand(Psi_avg),eps);
-ord_terms = simplify(coeffs(formula(expand(Psi_avg)),eps,'All'));
+epsmax = polynomialDegree(expand(Psi_avg),epsil);
+ord_terms = simplify(coeffs(formula(expand(Psi_avg)),epsil,'All'));
 
 for i = 1:epsmax+1
-    disp(['O(',char(eps^(i-1)),')']);
+    disp(['O(',char(epsil^(i-1)),')']);
     pretty(ord_terms(epsmax+2-i));
 end
 

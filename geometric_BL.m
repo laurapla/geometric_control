@@ -26,23 +26,23 @@ syms beta M U b real; % Compressibility factor, Mach number, velocity, airfoil s
 syms A1 A2 b1 b2; % Circulatory component constants
 syms Ka Kq Ti real; % Noncirculatory component constants
 syms Tp Tf Tv real; % Nonlinear flow components
-syms fp(a_eff_); % Effective point of separation
+syms fp(x9); % Effective point of separation
 syms w A_alpha H phi real; % Angular velocity, pitching amplitude, plunging amplitude, phase between pitching and plunging
 
 syms CNa;
 syms CNs(a_eff_); % Steady lift coefficient (function of alpha and plunging)
 assume(CNs(a_eff_),'real');
 
-syms dCv(x9,x10,aE_,a_eff_,da_); % Derivative of the vortex strength
-assume(dCv(x9,x10,aE_,a_eff_,da_),'real');
+syms dCv(aE_,x10); % Derivative of the vortex strength
+assume(dCv(aE_,x10),'real');
 
-syms eps real; % Epsilon (to determine the order of the terms)
+syms epsil real; % Epsilon (to determine the order of the terms)
 
 % Order of the variables
-w = w/eps;
-U = U/eps;
-A_alpha = A_alpha*eps;
-H = H*eps;
+w = w/epsil;
+U = U/epsil;
+A_alpha = A_alpha*epsil;
+H = H*epsil;
 if strcmp(In,'H')
     A_alpha = 0; phi = 0;
 elseif strcmp(In,'A')
@@ -66,7 +66,7 @@ f = [-b1*beta^2*(2*U/c)*x(1)+a_eff+da*c/(2*U);
     -x(4)/(Kq*Ti)+da*c/U;
     (CNa*beta^2*(2*U/c)*(A1*b1*x(1)+A2*b2*x(2))-4/(M*Ka*Ti)*x(3)-1/(M*Kq*Ti)*x(4)-x(5)+4/M*a_eff+da*c/U/M)*2*U/c/Tp;
     (-x(6)/Tf+fp(x(5)/CNa)/Tf)*2*U/c;
-    (-x(7)/Tv+dCv(x(5),x(6),aE,a_eff,da)/Tv)*2*U/c;
+    (-x(7)/Tv+dCv(aE,x(6))/Tv)*2*U/c;
     da;
     0;
     0];
@@ -133,6 +133,7 @@ Qeq = simplify([xeq; a; daeq; dheq]);
 % Amplitude and phase of the states
 Ax = sym('Ax',[11 1]); % Amplitude of the original BL states
 Ax(5:8) = [];
+Ax = Ax*epsil;
 phix = sym('phix',[11 1]); % Phase of the original BL states
 phix(5:8) = [];
 
@@ -149,37 +150,22 @@ elseif strcmp(Out,'D')
 end
 
 % Taylor expansion
-Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
-Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
-Psi_avg = simplify(subs(Psi_avg,A2,1-A1));
+Psi_avg = Taylor_expansion(Psi,Q,Qeq,dq,2);
 
 %% Order of terms
 
-Psi_avg = collect(Psi_avg,eps);
+ord_terms = simplify(coeffs(formula(expand(Psi_avg)),epsil,'All'));
+epsmax = length(ord_terms)-1;
 
-% Separate between numerator and denominator
-terms = children(Psi_avg);
-num = terms(1); % Numerator of Psi_avg
-den = 1/terms(2); % Denominator of Psi_avg
+for i = 1:epsmax+1
+    disp(['O(',char(epsil^(i-1)),')']);
+    pretty(ord_terms(epsmax+2-i));
+end
 
-% Order of the numerator and denominator
-ord_terms_num = simplify(coeffs(formula(num),eps,'All'));
-ord_terms_den = simplify(coeffs(formula(den),eps,'All'));
-epsmax_num = length(ord_terms_num)-1;
-epsmax_den = length(ord_terms_den)-1;
-
-% Simplify the terms
-terms = simplify(expand(ord_terms_num/ord_terms_den(1)));
-
-% for i = 1:epsmax_num+1
-%     disp(['O(',char(eps^(i-1)),')']);
-%     pretty(ord_terms(epsmax+2-i));
-% end
-
-if norder>epsmax_num-epsmax_den
-    norder = epsmax_num-epsmax_den;
+if norder>epsmax
+    norder = epsmax;
 end
 Psi_truncated = 0;
 for i = 0:norder
-    Psi_truncated = simplify(Psi_truncated+terms(epsmax_num-epsmax_den+1-i));
+    Psi_truncated = Psi_truncated+ord_terms(epsmax+1-i);
 end
