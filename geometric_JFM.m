@@ -157,7 +157,8 @@ if ~strcmp(Out,'S')
     end
     
     % Taylor expansion
-    Psi_avg = Taylor_expansion(Psi,Q,Qeq,dq,2);
+    Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
+    Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
 
 else
     

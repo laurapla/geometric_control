@@ -1,4 +1,4 @@
-function exp_avg = Taylor_expansion(L,Q,Qeq,dq,order)
+function expansion = Taylor_expansion(L,Q,Qeq,dq,order)
 
 % Multivariable Taylor series expansion
 % expansion: final expansion of the function L
@@ -10,10 +10,6 @@ function exp_avg = Taylor_expansion(L,Q,Qeq,dq,order)
 
 N = length(Q);
 expansion = L;
-syms w t;
-syms epsil real;
-
-w = w/epsil;
 
 % Zeroth term
 for i = 1:N
@@ -21,8 +17,6 @@ for i = 1:N
         expansion = simplify(subs(expansion,Q(i),Qeq(i)));
     end
 end
-
-exp_avg = simplify(expand(int(expansion,t,0,2*pi/w)*w/(2*pi)));
 
 % Terms with derivatives up to the order
 j = 1;
@@ -42,18 +36,15 @@ while j<=order
     % Substitute by the equilibrium values
     integr = der2;
     for i = 1:N
-        if i~=6 && i~=7
-            integr = simplify(subs(integr,Q(i),Qeq(i)));
-        end
+        integr = simplify(subs(integr,Q(i),Qeq(i)));
     end
     
-    int_avg = simplify(expand(int(integr,t,0,2*pi/w)*w/(2*pi)));
-    exp_avg = exp_avg+int_avg;
+    expansion = expansion+integr;
     der1 = simplify(der2);
     j = j+1;
     
 end
 
-exp_avg = simplify(exp_avg);
+expansion = simplify(expansion);
 
 end
