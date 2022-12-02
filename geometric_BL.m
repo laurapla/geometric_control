@@ -10,7 +10,7 @@ nT = 2; % Order of the Taylor expansion
 norder = 2; % Order of the averaged output that we want to keep
 
 In = 'HA'; % Motion: 'H' for plunging, 'A' for pitching, 'HA' for both
-Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient
+Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'N' for normal force coefficient
 
 %% Definitions
 
@@ -91,7 +91,7 @@ Cn = Cnf+Cnv+Cni; % Normal force coefficient
 
 % Chord force coefficient
 syms eta real; % Parameter that accounts for the viscous effects
-Ccp = CNa*aE^2; % Chord force under attached flow conditions
+Ccp = CNa*aE*tan(aE); % Chord force under attached flow conditions
 Cc = eta*Ccp*sqrt(x(6)); % Chord force coefficient under TE separation
 
 % Total lift and drag coefficients
@@ -121,7 +121,7 @@ Favg_sol = subs(F_avg,[da dh],[daeq dheq]);
 
 xeq = x;
 for i = 1:length(x)
-    xeq(i) = solve(Favg_sol(i)==0,x(i));
+    [xeq(i),~,~] = solve(Favg_sol(i)==0,x(i),'ReturnConditions',true);
     xeq(i) = simplify(subs(xeq(i),A2,1-A1));
     Favg_sol = subs(Favg_sol,x(i),xeq(i));
 end
@@ -147,10 +147,13 @@ if strcmp(Out,'L')
     Psi = Cl;
 elseif strcmp(Out,'D')
     Psi = Cd;
+elseif strcmp(Out,'N')
+    Psi = Cn;
 end
 
 % Taylor expansion
-Psi_avg = Taylor_expansion(Psi,Q,Qeq,dq,2);
+Psi_Taylor = Taylor_expansion(Psi,Q,[Qeq(1:5); x(6); x(7); Qeq(8:10)],dq,2);
+Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
 
 %% Order of terms
 
@@ -169,3 +172,7 @@ Psi_truncated = 0;
 for i = 0:norder
     Psi_truncated = Psi_truncated+ord_terms(epsmax+1-i);
 end
+
+% In case the amplitudes of the states don't vanish
+Psi_truntruncated = subs(Psi_truncated,Ax/epsil,zeros(7,1));
+Psi_truntruncated = simplify(subs(Psi_truntruncated,A1,1-A2));
