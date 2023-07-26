@@ -10,7 +10,7 @@ n = 2; % Pullback order
 nT = 2; % Order of the Taylor expansion
 norder = 2; % Order of the averaged output that we want to keep
 
-In = 'HU'; % Motion: 'H' for plunging, 'A' for pitching, 'U' for surging, 'HAU' for all
+In = 'HAU'; % Motion: 'H' for plunging, 'A' for pitching, 'U' for surging, 'HAU' for all
 Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'S' for point of separation
 
 %% Definitions
@@ -24,7 +24,8 @@ syms t real; % Time - Independent variable
 syms rho real; % Density
 syms b e real; % Airfoil semichord, pitching axis
 syms mv tv kda real; % Added mass, added mass constant, da constant
-syms w A_alpha H A_u phi phi_u real; % Angular velocity, pitching amplitude, plunging amplitude, phase between pitching and plunging
+syms w A_alpha H phi real; % Angular velocity, pitching amplitude, plunging amplitude, phase between pitching and plunging
+syms Us sigma phi_u real; % Mean surging speed, surging parameter, phase between pitching and surging
 
 syms CLs(a_eff); % Steady lift coefficient (function of alpha and plunging)
 assume(CLs(a_eff),'real');
@@ -44,18 +45,17 @@ C = [zeros(1,nc-1) 1];
 
 % Order of the variables
 w = w/epsil;
-% U = U/epsil;
 A_alpha = A_alpha*epsil;
 H = H*epsil;
-A_u = A_u*epsil;
+sigma = sigma*epsil;
 if strcmp(In,'H')
     A_alpha = 0;
-    A_u = 0;
+    sigma = 0;
     phi = 0;
     phi_u = 0;
 elseif strcmp(In,'A')
     H = 0;
-    A_u = 0;
+    sigma = 0;
     phi = 0;
     phi_u = 0;
 elseif strcmp(In,'U')
@@ -64,7 +64,7 @@ elseif strcmp(In,'U')
     phi = 0;
     phi_u = 0;
 elseif strcmp(In,'HA')
-    A_u = 0;
+    sigma = 0;
     phi_u = 0;
 elseif strcmp(In,'AU')
     H = 0;
@@ -85,7 +85,7 @@ Gamma0 = ka*CLs(a_eff)+kda*da; % Quasi-steady circulation
 Q = [xc; xv; a; da; dh; U];
 
 % Drift
-f = [A*xc+B*Gamma0; -xv/tv+(U*cos(a)-dh*sin(a))*da/tv; da; 0; 0; 0];
+f = [A*U*xc+B*U*Gamma0; -xv/tv+(U*cos(a)-dh*sin(a))*da/tv; da; 0; 0; 0];
 f = formula(f);
 
 % Control vectors
@@ -118,7 +118,7 @@ end
 % Inputs
 ua = w^2*A_alpha*cos(w*t);
 uh = w^2*H*b*cos(w*t+phi);
-uu = w^2*A_u*cos(w*t+phi_u);
+uu = w*Us*sigma*sin(w*t+phi_u);
 
 G = ga*ua+gh*uh+gu*uu;
 
@@ -130,7 +130,6 @@ F_avg = simplify(f+Gvec_avg);
 %% Equilibrium of the averaged dynamics
 
 dheq = 0; % The equilibrium of dh is automatically satisfied, so for simplification we assume it's zero
-dUeq = 0; % The equilibrium of dU is automatically satisfied, so for simplification we assume it's zero
 
 % Solving the equilibrium points of the averaged dynamics
 if strcmp(Out,'S')
@@ -142,9 +141,9 @@ else
     Favg_sol = subs(F_avg,[da dh],[daeq dheq]);
 end
 xveq = solve(Favg_sol(nc+1)==0,xv); % xv of equilibrium
-xceq = -inv(A)*(Favg_sol(1:nc)-A*xc); % xc of equilibrium
+xceq = -inv(A*U)*(Favg_sol(1:nc)-A*U*xc); % xc of equilibrium
 
-Qeq = [xceq; xveq; a; daeq; dheq; U];
+Qeq = [xceq; xveq; a; daeq; dheq; Us];
 
 if strcmp(Out,'S')
     Qeq = [Qeq(1:nc+1); xseq; Qeq(nc+2:end)];
@@ -163,7 +162,7 @@ dAv = Av*cos(w*t+phiv);
 ddalpha = w*A_alpha*sin(w*t);
 dalpha = -A_alpha*cos(w*t);
 dhdot = w*H*b*(sin(w*t+phi)-sin(phi));
-dUdot = w*A_u*(sin(w*t+phi_u)-sin(phi_u));
+dUdot = -w*Us*sigma*cos(w*t+phi_u);
 dq = [dAx; dAv; dalpha; ddalpha; dhdot; dUdot];
 
 if ~strcmp(Out,'S')
@@ -194,7 +193,7 @@ end
 
 %% Order of terms
 
-Psi_avg = subs(Psi_avg,U,U/epsil);
+Psi_avg = subs(Psi_avg,Us,Us/epsil);
 epsmax = polynomialDegree(expand(Psi_avg),epsil);
 ord_terms = simplify(coeffs(formula(expand(Psi_avg)),epsil,'All'));
 

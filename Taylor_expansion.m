@@ -13,9 +13,7 @@ expansion = L;
 
 % Zeroth term
 for i = 1:N
-    if i~=6 && i~=7
-        expansion = simplify(subs(expansion,Q(i),Qeq(i)));
-    end
+    expansion = subs(expansion,Q(i),Qeq(i));
 end
 
 % Terms with derivatives up to the order
@@ -36,15 +34,15 @@ while j<=order
     % Substitute by the equilibrium values
     integr = der2;
     for i = 1:N
-        integr = simplify(subs(integr,Q(i),Qeq(i)));
+        integr = subs(integr,Q(i),Qeq(i));
     end
     
     expansion = expansion+integr;
-    der1 = simplify(der2);
+    der1 = der2;
     j = j+1;
     
 end
 
-expansion = simplify(expansion);
+% expansion = simplify(expansion);
 
 end

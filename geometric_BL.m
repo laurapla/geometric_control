@@ -10,7 +10,7 @@ nT = 2; % Order of the Taylor expansion
 norder = 2; % Order of the averaged output that we want to keep
 
 In = 'HA'; % Motion: 'H' for plunging, 'A' for pitching, 'HA' for both
-Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'N' for normal force coefficient
+Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'N' for normal force coefficient, 'C' for chord force coefficient
 
 %% Definitions
 
@@ -23,7 +23,8 @@ syms a da dh real; % Angle of attack, pitching velocity, plunging velocity
 syms t real; % Time - Independent variable
 syms rho real; % Density
 syms beta M U b real; % Compressibility factor, Mach number, velocity, airfoil semichord
-syms A1 A2 b1 b2; % Circulatory component constants
+syms A1 b1 b2; % Circulatory component constants
+A2 = 1-A1;
 syms Ka Kq Ti real; % Noncirculatory component constants
 syms Tp Tf Tv real; % Nonlinear flow components
 syms fp(x9); % Effective point of separation
@@ -33,8 +34,8 @@ syms CNa;
 syms CNs(a_eff_); % Steady lift coefficient (function of alpha and plunging)
 assume(CNs(a_eff_),'real');
 
-syms dCv(aE_,x10); % Derivative of the vortex strength
-assume(dCv(aE_,x10),'real');
+syms dCv(Cnc_,x10); % Derivative of the vortex strength
+assume(dCv(Cnc_,x10),'real');
 
 syms epsil real; % Epsilon (to determine the order of the terms)
 
@@ -52,6 +53,7 @@ end
 c = 2*b; % Airfoil chord
 a_eff = a+atan(dh/U); % Effective angle of attack
 aE = (2*U/c)*beta^2*(A1*b1*x(1)+A2*b2*x(2)); % Effective angle of attack
+q = da*c/U; % Pitch rate
 % fp = (2*sqrt(CNs(x(5)/CNa)/x(5))-1)^2; % Effective point of separation
 
 %% State Space Model
@@ -60,13 +62,13 @@ aE = (2*U/c)*beta^2*(A1*b1*x(1)+A2*b2*x(2)); % Effective angle of attack
 Q = [x; a; da; dh];
 
 % Drift vector
-f = [-b1*beta^2*(2*U/c)*x(1)+a_eff+da*c/(2*U);
-    -b2*beta^2*(2*U/c)*x(2)+a_eff+da*c/(2*U);
+f = [-b1*beta^2*(2*U/c)*x(1)+a_eff+q/2;
+    -b2*beta^2*(2*U/c)*x(2)+a_eff+q/2;
     -x(3)/(Ka*Ti)+a_eff;
-    -x(4)/(Kq*Ti)+da*c/U;
-    (CNa*beta^2*(2*U/c)*(A1*b1*x(1)+A2*b2*x(2))-4/(M*Ka*Ti)*x(3)-1/(M*Kq*Ti)*x(4)-x(5)+4/M*a_eff+da*c/U/M)*2*U/c/Tp;
+    -x(4)/(Kq*Ti)+q;
+    (CNa*aE-4/(M*Ka*Ti)*x(3)-1/(M*Kq*Ti)*x(4)-x(5)+4/M*a_eff+q/M)*2*U/c/Tp;
     (-x(6)/Tf+fp(x(5)/CNa)/Tf)*2*U/c;
-    (-x(7)/Tv+dCv(aE,x(6))/Tv)*2*U/c;
+    (-x(7)/Tv+dCv(CNa*aE,x(6))/Tv)*2*U/c;
     da;
     0;
     0];
@@ -76,8 +78,6 @@ ga = [0 0 0 0 0 0 0 0 1 0].'; % Control vector of the pitching motion
 gh = [0 0 0 0 0 0 0 0 0 1].'; % Control vector of the plunging motion
 
 %% Lift and drag coefficients
-
-q = da*c/U; % Pitch rate
 
 % Normal force coefficients
 Cnia = -4/M*x(3)/(Ka*Ti)+4/M*a_eff; % Non-circulatory load due to the angle of attack
@@ -127,6 +127,9 @@ for i = 1:length(x)
 end
 
 Qeq = simplify([xeq; a; daeq; dheq]);
+syms f_p dC_v % Should it be f_p(a, da, dh) dC_v(a, da, dh)?
+Qeq(6) = f_p;
+Qeq(7) = dC_v;
 
 %% Averaged output
 
@@ -149,18 +152,20 @@ elseif strcmp(Out,'D')
     Psi = Cd;
 elseif strcmp(Out,'N')
     Psi = Cn;
+elseif strcmp(Out,'C')
+    Psi = Cc;    
 end
 
 % Taylor expansion
-Psi_Taylor = Taylor_expansion(Psi,Q,[Qeq(1:5); x(6); x(7); Qeq(8:10)],dq,2);
-Psi_avg = simplify(int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi));
+Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
+Psi_avg = int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi);
 
 %% Order of terms
 
-ord_terms = simplify(coeffs(formula(expand(Psi_avg)),epsil,'All'));
+ord_terms = coeffs(formula(simplify(Psi_avg,"IgnoreAnalyticConstraints",true,'Steps',60)),epsil,'All');
 epsmax = length(ord_terms)-1;
 
-for i = 1:epsmax+1
+for i = 1:epsmax+1      
     disp(['O(',char(epsil^(i-1)),')']);
     pretty(ord_terms(epsmax+2-i));
 end
