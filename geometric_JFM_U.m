@@ -47,6 +47,7 @@ C = [zeros(1,nc-1) 1];
 w = w/epsil;
 A_alpha = A_alpha*epsil;
 H = H*epsil;
+Us = Us/epsil;
 sigma = sigma*epsil;
 if strcmp(In,'H')
     A_alpha = 0;
@@ -162,7 +163,7 @@ dAv = Av*cos(w*t+phiv);
 ddalpha = w*A_alpha*sin(w*t);
 dalpha = -A_alpha*cos(w*t);
 dhdot = w*H*b*(sin(w*t+phi)-sin(phi));
-dUdot = -w*Us*sigma*cos(w*t+phi_u);
+dUdot = -Us*sigma*cos(w*t+phi_u);
 dq = [dAx; dAv; dalpha; ddalpha; dhdot; dUdot];
 
 if ~strcmp(Out,'S')
@@ -191,9 +192,10 @@ else
     
 end
 
+
 %% Order of terms
 
-Psi_avg = subs(Psi_avg,Us,Us/epsil);
+% Psi_avg = subs(Psi_avg,Us,Us/epsil);
 epsmax = polynomialDegree(expand(Psi_avg),epsil);
 ord_terms = simplify(coeffs(formula(expand(Psi_avg)),epsil,'All'));
 
