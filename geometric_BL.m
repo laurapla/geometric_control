@@ -160,6 +160,8 @@ end
 Psi_Taylor = Taylor_expansion(Psi,Q,Qeq,dq,2);
 Psi_avg = int(Psi_Taylor,t,0,2*pi/w)*w/(2*pi);
 
+Psi_avg = subs(Psi_avg,Ax,zeros(7,1));
+
 %% Order of terms
 
 ord_terms = coeffs(formula(simplify(Psi_avg,"IgnoreAnalyticConstraints",true,'Steps',60)),epsil,'All');

@@ -10,8 +10,8 @@ n = 2; % Pullback order
 nT = 2; % Order of the Taylor expansion
 norder = 2; % Order of the averaged output that we want to keep
 
-In = 'HAU'; % Motion: 'H' for plunging, 'A' for pitching, 'U' for surging, 'HAU' for all
-Out = 'L'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'S' for point of separation
+In = 'U'; % Motion: 'H' for plunging, 'A' for pitching, 'U' for surging, 'HAU' for all
+Out = 'D'; % Output: 'L' for lift coefficient, 'D' for drag coefficient, 'S' for point of separation
 
 %% Definitions
 
@@ -78,7 +78,7 @@ end
 c = 2*b;
 ka = U*c/2;
 a_eff = a+atan(dh/U);
-Gamma0 = ka*CLs(a_eff)+kda*da; % Quasi-steady circulation
+Gamma0 = ka*CLs(a_eff)+b^2*kda*da; % Quasi-steady circulation
 
 %% State Space Model
 
